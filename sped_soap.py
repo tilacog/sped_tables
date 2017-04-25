@@ -65,8 +65,8 @@ async def fetch(url, local_fname):
             f_handle.write(chunk)
     return await resp.release()
 
-if __name__ == '__main__':
 
+def download():
     tasks = []
     for sped_name in sped_names:
         tables, base_url = get_service_info(sped_name)
@@ -77,3 +77,7 @@ if __name__ == '__main__':
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(asyncio.wait(tasks))
+
+
+if __name__ == '__main__':
+    download()
