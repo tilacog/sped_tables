@@ -79,5 +79,28 @@ def download():
     loop.run_until_complete(asyncio.wait(tasks))
 
 
+def generate_records(bytestream: bytes) -> None:
+    "generates records (dicts) from a given fileinput (in bytes)"
+    text = bytestream.decode('latin1')
+    first_line, *content = [line.strip() for line in text.splitlines()]
+
+    if not content:
+        raise RuntimeError('empty table')
+
+    _, *headers_string = first_line.split(maxsplit=1)
+
+    # use callables(lambdas) to handle either present or missing headers
+    headers = (
+        (lambda: headers_string[0].split())
+        if headers_string
+        else lambda: ('field-{:0>2}'.format(i) for i in count(start=1))
+    )
+
+    # build records and yield them
+    for line in content:
+        values = line.split('|')
+        yield dict(zip(headers(), values))
+
+
 if __name__ == '__main__':
     download()
