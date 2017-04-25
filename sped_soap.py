@@ -54,6 +54,7 @@ def make_url(base, data):
     q = {'idTabela': data['id'], 'versao': data['versao']}
     return base + '?' + urlencode(q)
 
+
 async def fetch(url, local_fname):
     resp = await aiohttp.get(url)
     with open(local_fname, 'wb') as f_handle:
