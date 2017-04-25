@@ -1,16 +1,16 @@
 import asyncio
-import aiohttp
 import xml.etree.ElementTree as ET
+from itertools import count
 
-from zeep import Client
+import aiohttp
 from slugify import slugify
-
+from zeep import Client
 
 # available sped codes
 sped_names = ('SpedFiscal', 'SpedPisCofins', 'SpedContabil', 'SpedEcf')
 
 
-def get_service_info(sped_code):
+def get_service_info(sped_code: str) -> (list, str):
     client = Client('http://www.sped.fazenda.gov.br'
                     '/spedtabelas/WsConsulta/WsConsulta.asmx?WSDL')
 
