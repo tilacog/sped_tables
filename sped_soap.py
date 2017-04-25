@@ -30,7 +30,7 @@ def get_service_info(sped_code: str) -> (list, str):
     return (table_data, base_url)
 
 
-def persist_to_csv(data):
+def persist_to_csv(data: dict) -> None:
     "for debugging purposes"
     import csv
 
@@ -42,20 +42,20 @@ def persist_to_csv(data):
         writer.writerows(data)
 
 
-def make_filename(table_data, sped_name):
+def make_filename(table_data: dict, sped_name: str) -> str:
     return (
         '{n}-{d[id]}-{d[versao]}-{s}.tbl'
         .format(n=sped_name, d=table_data, s=slugify(table_data['desc']))
     )
 
 
-def make_url(base, data):
+def make_url(base: str, data: dict) -> str:
     from urllib.parse import urlencode
     q = {'idTabela': data['id'], 'versao': data['versao']}
     return base + '?' + urlencode(q)
 
 
-async def fetch(url, local_fname):
+async def fetch(url: str, local_fname: str):
     resp = await aiohttp.get(url)
     with open(local_fname, 'wb') as f_handle:
         while True:
@@ -66,7 +66,7 @@ async def fetch(url, local_fname):
     return await resp.release()
 
 
-def download():
+def download() -> None:
     tasks = []
     for sped_name in sped_names:
         tables, base_url = get_service_info(sped_name)
