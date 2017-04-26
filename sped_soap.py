@@ -109,7 +109,7 @@ def generate_database_records(sped_name: str, table_data: dict,
     with open(filepath, 'rb') as fh:
         return {
             'document_type': sped_name,
-            'name': (slugify(table_data['desc'])
+            'name': (table_data['slug']
                      or 'table-%s' % (table_data['id'],)),
             'meta': table_data,
             'data': list(generate_records_from_file(fh))
