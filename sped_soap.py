@@ -102,5 +102,18 @@ def generate_records_from_file(bytestream: bytes) -> dict:
         yield dict(zip(headers(), values))
 
 
+def generate_database_records(sped_name: str, table_data: dict,
+                              filepath: str) -> dict:
+    "returns a database record (dict) ready for insertion into a database"
+    with open(filepath, 'rb') as fh:
+        return {
+            'document_type': sped_name,
+            'name': (slugify(table_data['desc'])
+                     or 'table-%s' % (table_data['id'],)),
+            'meta': table_data,
+            'data': list(generate_records_from_file(fh))
+        }
+
+
 if __name__ == '__main__':
     download()
