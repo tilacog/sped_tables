@@ -1,6 +1,7 @@
 import asyncio
 import xml.etree.ElementTree as ET
 from itertools import count
+from pathlib import Path
 
 import aiohttp
 from slugify import slugify
@@ -66,14 +67,20 @@ async def fetch(url: str, local_fname: str):
     return await resp.release()
 
 
-def download() -> None:
+def download(to='.') -> None:
     tasks = []
+
+    destination = Path(to)
+    destination.mkdir(exist_ok=True)
+
     for sped_name in sped_names:
         tables, base_url = get_service_info(sped_name)
         for table in tables:
             final_url = make_url(base_url, table)
             filename = make_filename(table, sped_name)
-            tasks.append(asyncio.ensure_future(fetch(final_url, filename)))
+            tasks.append(asyncio.ensure_future(
+                fetch(final_url, (destination / filename).as_posix())
+            ))
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(asyncio.wait(tasks))
@@ -116,4 +123,4 @@ def generate_database_records(sped_name: str, table_data: dict,
 
 
 if __name__ == '__main__':
-    download()
+    download(to='downloaded_tables')
