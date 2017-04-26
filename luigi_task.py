@@ -16,12 +16,22 @@ THIS_PATH = Path(__file__).parent.absolute()
 class FetchTableData(luigi.Task):
 
     def output(self):
-        return luigi.LocalTarget('tables_to_download.json')
+        "a directory"
+        return luigi.LocalTarget(
+            (THIS_PATH / 'downloaded_tables_metadata').as_posix()
+        )
 
     def run(self):
+        "will write one json file with metadata for each unit/table"
+
+        destination = Path(self.output().path)
+        destination.mkdir(exist_ok=True)
+
         tables = fetch_all_table_data()
-        with self.output().open('w') as fh:
-            json.dump(tables, fh)
+        for table in tables:
+            fname = (destination / (table['basename'] + '.json')).as_posix()
+            with open(fname, 'w') as fh:
+                json.dump(table, fh)
 
 
 class DownloadFiles(luigi.Task):
@@ -31,8 +41,17 @@ class DownloadFiles(luigi.Task):
         return FetchTableData()
 
     def parsed_input(self):
-        with self.input().open() as fh:
-            return json.load(fh)
+
+        directory = Path(self.input().path)
+        files = directory.glob('*.json')
+
+        data = []
+        for f in files:
+            with f.open() as fh:
+                data.append(json.load(fh))
+
+        return data
+
 
     def run(self):
         "downloads lots of files asynchronously"
@@ -51,12 +70,41 @@ class DownloadFiles(luigi.Task):
         "a directory"
         return luigi.LocalTarget((THIS_PATH / 'downloaded_tables').as_posix())
 
-    def completed(self):
+    def complete(self):
         "output directory must not be empty"
         dest_dir = Path(self.output().path)
-        return dest_dir.glob('*') == []
+        if not dest_dir.exists():
+            return False
+        return list(dest_dir.glob('*')) != []
 
 
 class InsertIntoDatabase(luigi.Task):
-    # TODO
-    pass
+    "Generate records from a single file and inserts them into a database"
+
+    table_metadata_file = luigi.Parameter()
+
+    def requires(self):
+        return DownloadFiles()
+
+    def output(self):
+        pass  # TODO
+
+    def run(self):
+        pass  # TODO
+
+    def complete(self):
+        return True  # TODO
+
+class UpdateDatabase(luigi.Task):  # TODO: Try to use it as a wrapper task
+
+    def run(self):
+
+        fetch_table_data_task = yield FetchTableData()
+        table_data_dir = Path(fetch_table_data_task.path)
+
+        dependent_tasks = [InsertIntoDatabase(table_metadata_file=x.as_posix())
+                           for x in table_data_dir.glob('*.json')]
+        yield dependent_tasks
+
+
+
