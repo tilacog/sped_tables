@@ -79,7 +79,7 @@ def download() -> None:
     loop.run_until_complete(asyncio.wait(tasks))
 
 
-def generate_records(bytestream: bytes) -> None:
+def generate_records_from_file(bytestream: bytes) -> dict:
     "generates records (dicts) from a given fileinput (in bytes)"
     text = bytestream.decode('latin1')
     first_line, *content = [line.strip() for line in text.splitlines()]
