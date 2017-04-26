@@ -1,5 +1,6 @@
 import asyncio
 import xml.etree.ElementTree as ET
+from functools import lru_cache
 from itertools import count
 from pathlib import Path
 
@@ -31,23 +32,19 @@ def get_service_info(sped_code: str) -> (list, str):
     return (table_data, base_url)
 
 
-def persist_to_csv(data: dict) -> None:
-    "for debugging purposes"
-    import csv
-
-    fieldnames = list(data[0].keys())
-
-    with open('tables.csv', 'w') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(data)
-
-
-def make_filename(table_data: dict, sped_name: str) -> str:
-    return (
-        '{n}-{d[id]}-{d[versao]}-{s}.tbl'
-        .format(n=sped_name, d=table_data, s=slugify(table_data['desc']))
-    )
+@lru_cache()
+def fetch_all_table_data() -> list:
+    "streamlines table data while inserting extra data into units"
+    results = []
+    for sped_name in sped_names:
+        tables, base_url = get_service_info(sped_name)
+        for table in tables:
+            table['url'] = make_url(base_url, table)
+            table['slug'] = slugify(table['desc'])
+            table['basename'] = ('{n}-{d[id]}-{d[versao]}-{d[slug]}.tbl'
+                                .format(n=sped_name.lower(), d=table))
+            results.append(table)
+    return results
 
 
 def make_url(base: str, data: dict) -> str:
@@ -67,20 +64,17 @@ async def fetch(url: str, local_fname: str):
     return await resp.release()
 
 
-def download(to='.') -> None:
-    tasks = []
+def download(tables: list, to='.') -> None:
 
     destination = Path(to)
     destination.mkdir(exist_ok=True)
 
-    for sped_name in sped_names:
-        tables, base_url = get_service_info(sped_name)
-        for table in tables:
-            final_url = make_url(base_url, table)
-            filename = make_filename(table, sped_name)
-            tasks.append(asyncio.ensure_future(
-                fetch(final_url, (destination / filename).as_posix())
-            ))
+    tasks = []
+    for table in tables:
+        fname = (destination / table['basename']).as_posix()
+        tasks.append(asyncio.ensure_future(
+            fetch(url=table['url'], local_fname=fname)
+        ))
 
     loop = asyncio.get_event_loop()
     loop.run_until_complete(asyncio.wait(tasks))
@@ -123,4 +117,5 @@ def generate_database_records(sped_name: str, table_data: dict,
 
 
 if __name__ == '__main__':
-    download(to='downloaded_tables')
+    download(tables=fetch_all_table_data(),
+             to='downloaded_tables')
