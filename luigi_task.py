@@ -143,6 +143,10 @@ class InsertIntoDatabase(luigi.Task):
             self.mark_ticket('EMPTY')
             return
 
+        except FileNotFoundError:
+            self.mark_ticket('FILE NOT FOUND')
+            return
+
         self.insert(database_record)
 
     def insert(self, database_record: dict) -> bool:
