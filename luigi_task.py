@@ -14,7 +14,7 @@ from psycopg2 import IntegrityError
 from psycopg2.extras import Json
 from psycopg2.pool import SimpleConnectionPool
 
-from sped_soap import download, fetch_all_table_data, make_database_record
+from sped_tables import download, fetch_all_table_data, make_database_record
 
 THIS_PATH = Path(__file__).parent.absolute()
 DOWNLOADED_FILES_DIR = THIS_PATH / 'downloaded_tables'
