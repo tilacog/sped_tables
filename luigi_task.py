@@ -5,13 +5,31 @@ Dataflow to:
   3. transform and insert downloaded tables into a PostgreSQL database
 """
 import json
+import os
+from contextlib import contextmanager
 from pathlib import Path
 
 import luigi
+from psycopg2 import IntegrityError
+from psycopg2.extras import Json
+from psycopg2.pool import SimpleConnectionPool
 
 from sped_soap import download, fetch_all_table_data, make_database_record
 
 THIS_PATH = Path(__file__).parent.absolute()
+DOWNLOADED_FILES_DIR = THIS_PATH / 'downloaded_tables'
+
+pool = SimpleConnectionPool(minconn=1, maxconn=1,
+                            dbname=os.environ['DB_NAME'],
+                            user=os.environ['DB_USER'],
+                            password=os.environ['DB_PASSWD'])
+
+
+@contextmanager
+def getconn():
+    conn = pool.getconn()
+    yield conn
+    pool.putconn(conn)
 
 
 class FetchTableData(luigi.Task):
@@ -68,7 +86,7 @@ class DownloadFiles(luigi.Task):
 
     def output(self):
         "a directory"
-        return luigi.LocalTarget((THIS_PATH / 'downloaded_tables').as_posix())
+        return luigi.LocalTarget(DOWNLOADED_FILES_DIR.as_posix())
 
     def complete(self):
         "output directory must not be empty"
@@ -89,16 +107,13 @@ class InsertIntoDatabase(luigi.Task):
         'SpedEcf': 'ecf',
     }
 
-    def requires(self):
-        return DownloadFiles()
-
     def output(self):
         "touched file (like a ticket) with database insertion result"
         dest_dir = THIS_PATH / 'insertion_results'
         dest_dir.mkdir(exist_ok=True)
 
         input_file = Path(self.table_metadata_file)
-        basename = input_file.name.split('.', maxsplit=1)
+        basename, *_ = input_file.name.split('.', maxsplit=1)
 
         ticket = 'db-insert-results-for-%s' % basename
         return luigi.LocalTarget((dest_dir / ticket).as_posix())
@@ -112,9 +127,8 @@ class InsertIntoDatabase(luigi.Task):
             metadata = json.load(fh)
 
         # find local table file
-        source_dir = Path(self.input().path)
         basename = metadata.pop('basename')
-        table_file = source_dir / basename
+        table_file = DOWNLOADED_FILES_DIR / basename
 
         # build database record
         sped_name = self.remapped_sped_names[metadata.pop('sped-name')]
@@ -132,14 +146,33 @@ class InsertIntoDatabase(luigi.Task):
         self.insert(database_record)
 
     def insert(self, database_record: dict) -> bool:
-        # TODO
-        pass
+
+        # adapt json objects
+        for key in ['meta', 'data']:
+            database_record[key] = Json(database_record[key])
+
+        with getconn() as conn:
+            try:
+                conn.cursor().execute("""
+                insert into public.external_data
+                (document_type, name, meta, data)
+                values
+                (%(document_type)s, %(name)s, %(meta)s, %(data)s);
+                """, database_record)
+            except IntegrityError:
+                conn.rollback()
+                self.mark_ticket('FAILED')
+            else:
+                conn.commit()
+                self.mark_ticket('SUCCES')
 
 
 class UpdateDatabase(luigi.Task):
+    "a wrapper task with dynamic requirements"
 
     def run(self):
 
+        yield DownloadFiles()
         fetch_table_data_task = yield FetchTableData()
         table_data_dir = Path(fetch_table_data_task.path)
 
